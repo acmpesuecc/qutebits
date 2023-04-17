@@ -1,9 +1,7 @@
 from QuantumCircuit import QuantumCircuit, QGate
 import numpy as np
-from consts import gate2matrix
-
-cnots = [QGate.CNOT_START, QGate.CNOT_END]
-
+from consts import gate2matrix, cnots
+import random
 
 class Executor:
     def __init__(self, qc: QuantumCircuit):
@@ -20,10 +18,9 @@ class Executor:
 
                 if i<len(qc.circ[j]):
                     gate = qc.circ[j][i][0]
-                    g_matrix = gate2matrix[gate]
                 else:
-                    gate = None
-                    g_matrix = np.eye(2)
+                    gate = QGate.IDENTITY
+                g_matrix = gate2matrix[gate]
                 # print(f"layer: {i}, qubit: {j}, gate: {gate}")
                 layer_matrix = np.kron(layer_matrix, g_matrix)
                 # print(layer_matrix)
@@ -34,3 +31,23 @@ class Executor:
 
     def get_statevector(self):
         return self.state_vector
+
+    def get_probs(self):
+        probabilities = [np.round(abs(e)**2, 4) for e in self.state_vector]
+        return probabilities
+
+    def measure_all(self, shots=8096):
+        values = [i for i in range(len(self.state_vector))]
+        probabilities = [np.round(abs(e)**2, 4) for e in self.state_vector]
+        # cum_probs = [probabilities[0]]
+        # for i in range(1, len(probabilities)):
+        #     cum_probs.append(cum_probs[i-1]+probabilities[i])
+        # # print(probabilities)
+        # # print(cum_probs)
+        counts = [0 for _ in self.state_vector]
+        for _ in range(shots):
+            choice = random.choices(values, weights=probabilities, k=1)[0]
+            counts[choice]+=1
+        return counts
+
+

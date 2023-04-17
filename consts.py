@@ -2,6 +2,8 @@ import numpy as np
 import math
 from QuantumCircuit import QGate as g
 
+cnots = [g.CNOT_START, g.CNOT_END]
+
 GATE_HADAMARD = (1/math.sqrt(2)) * np.array([[1, 1],
                                              [1, -1]])
 GATE_PAULI_X = np.array([[0, 1],
@@ -29,5 +31,6 @@ gate2matrix = {
     g.PAULI_Y: GATE_PAULI_Y,
     g.PAULI_Z: GATE_PAULI_Z,
     g.CNOT_START: GATE_CNOT,
-    g.CNOT_END: GATE_CNOT_OPP
+    g.CNOT_END: GATE_CNOT_OPP,
+    g.IDENTITY: np.eye(2)
 }
