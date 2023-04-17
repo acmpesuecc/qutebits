@@ -1,4 +1,5 @@
 from enum import Enum, auto
+import io
 
 class QGate(Enum):
     HADAMARD = "H"
@@ -16,21 +17,26 @@ class QuantumCircuit:
         self.no_qubits = no_qubits
         self.circ = [[] for _ in range(no_qubits)]
 
-    def draw(self):
+    def __str__(self):
+        out = io.StringIO()
         for qubit_gates in self.circ:
-            print("|0>", end="")
+            print("|0>", end="", file = out)
             for gate in qubit_gates:
                 gate = gate[0]
                 if gate==QGate.IDENTITY:
-                    print("-----", end="")
+                    print("-----", end="", file = out)
                 else:
-                    print(f"-|{gate.value}|-", end="")
-            print("\n")
-            # print(2*" ", end="")
+                    print(f"-|{gate.value}|-", end="", file = out)
+            print("\n", file = out)
+            # print(2*" ", end="", file = out)
             # for i, gate in enumerate(qubit_gates):
             #     gate = gate[0]
             #     if gate in cnots:
-            #         print(5*i*" ", "  |  ")
+            #         print(5*i*" ", "  |  ", file = out)
+        return out.getvalue()
+
+    def draw(self):
+        print(end=self.__str__())
 
     def h(self, index):
         self.circ[index].append((QGate.HADAMARD,))
