@@ -2,10 +2,10 @@
 # + Show circuit
 # + Show distribution
 # + Allow measurement
-# - Use actual circuit elements
+# + Use actual circuit elements
 # - Edit circuit
 
-from QuantumCircuit import QuantumCircuit
+from QuantumCircuit import QuantumCircuit, QGate
 from Executor import Executor, np
 
 import pygame
@@ -27,6 +27,18 @@ green = c@0xa0ffe0
 fps = 60
 
 w, h = res = (1280, 720)
+
+gate_size = 80
+
+gate_sprites = {
+	QGate.HADAMARD:   pygame.image.load('./sprites/hadamard.png'),
+	QGate.PAULI_X:    pygame.image.load('./sprites/x.png'),
+	QGate.PAULI_Y:    pygame.image.load('./sprites/y.png'),
+	QGate.PAULI_Z:    pygame.image.load('./sprites/z.png'),
+	QGate.CNOT_START: pygame.image.load('./sprites/cnot start.png'),
+	QGate.CNOT_END:   pygame.image.load('./sprites/cnot end.png'),
+	QGate.IDENTITY:   pygame.image.load('./sprites/identity.png'),
+}
 
 def updateStat(msg = None, update = True):
 	rect = (0, h-20, w, 21)
@@ -83,33 +95,32 @@ def toggleFullscreen():
 	else: display = pygame.display.set_mode(res, FULLSCREEN); updateDisplay()
 
 def render_quantum_circuit(qc):
-	lines = str(qc).splitlines()
-	sizes = [font.size(line) for line in lines]
-	c_w = max(size[0] for size in sizes)
-	c_h = sizes[0][1]
-	out = pygame.Surface((c_w, c_h*len(lines)), SRCALPHA)
+	c_w = max(len(line) for line in qc.circ)
+	c_h = qc.no_qubits
 
-	for i, line in enumerate(lines):
-		tsurf = font.render(line, True, fg)
-		out.blit(tsurf, (0, i*c_h))
+	out = pygame.Surface((gate_size + c_w*gate_size, c_h*gate_size), SRCALPHA)
+
+	for row, qubit_line in enumerate(qc.circ):
+		for col, gate in enumerate(qubit_line):
+			out.blit(gate_sprites[gate[0]], (gate_size*(1+col), gate_size*row))
 
 	return out
 
 def render_graph(values: np.ndarray, size):
-	out = pygame.Surface((size, size + 25), SRCALPHA)
+	out = pygame.Surface((size, 25 + size + 25), SRCALPHA)
 	section_width = size // len(values)
 	bar_width = section_width // 2
 	qbits = len(values).bit_length() - 1
 	for i, value in enumerate(values):
 		out.fill(transparent_fg, (
 			bar_width // 2 + section_width * i,
-			0, bar_width, size))
+			25, bar_width, size))
 		out.fill(fg, (
 			bar_width // 2 + section_width * i,
-			size * (1 - abs(value)), bar_width, size * abs(value)))
+			25 + size * (1 - abs(value)), bar_width, size * abs(value)))
 		tsurf = tfont.render(f'{i:0{qbits}b}', True, fg)
 		offset = (section_width - tsurf.get_width()) // 2
-		out.blit(tsurf, (offset + section_width * i, size))
+		out.blit(tsurf, (offset + section_width * i, 25 + size))
 	return out
 
 def render_measurement(values: list, size):
