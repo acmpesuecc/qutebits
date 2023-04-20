@@ -45,7 +45,7 @@ gate_sprites = {
 	QGate.CNOT_START: pygame.image.load('./sprites/cnot start.png'),
 	QGate.CNOT_END:   pygame.image.load('./sprites/cnot end.png'),
 	QGate.IDENTITY:   pygame.image.load('./sprites/identity.png'),
-	'start':          pygame.image.load('./sprites/start.png')
+	QGate.START:      pygame.image.load('./sprites/start.png')
 }
 
 def updateStat(msg = None, update = True):
@@ -117,6 +117,14 @@ def updateDisplay():
 	reset_surf = reset_button.render(hover=hover)
 	display.blit(reset_surf, reset_button.get_pos())
 
+	hover = pygame.mouse.get_pos() in add_view_button
+	measure_surf = add_view_button.render(hover=hover)
+	display.blit(measure_surf, add_view_button.get_pos())
+
+	hover = pygame.mouse.get_pos() in delete_view_button
+	reset_surf = delete_view_button.render(hover=hover)
+	display.blit(reset_surf, delete_view_button.get_pos())
+
 	updateStat(update = False)
 	pygame.display.flip()
 
@@ -133,6 +141,8 @@ def toggleFullscreen():
 def update_sizes():
 	measure_button.update_pos(((w//2-2*measure_button.rect.w)//3, 6*h//7))
 	reset_button.update_pos(((w-reset_button.rect.w)//3, 6*h//7))
+	add_view_button.update_pos(((w//2-2*add_view_button.rect.w)//3, 5*h//7))
+	delete_view_button.update_pos(((w-delete_view_button.rect.w)//3, 5*h//7))
 
 def render_quantum_circuit(qc):
 	c_w = max(len(line) for line in qc.circ)
@@ -141,14 +151,24 @@ def render_quantum_circuit(qc):
 	out = pygame.Surface((gate_size + c_w*gate_size, c_h*gate_size), SRCALPHA)
 
 	for row, qubit_line in enumerate(qc.circ):
-		out.blit(gate_sprites['start'], (0, gate_size*row))
-		for col, gate in enumerate(qubit_line):
-			out.blit(gate_sprites[gate[0]], (gate_size*(1+col), gate_size*row))
+		out.blit(gate_sprites[QGate.START], (0, gate_size*row))
+		for col, gate in enumerate(qubit_line, 1):
+			out.blit(gate_sprites[gate[0]], (gate_size*col, gate_size*row))
+			if gate[0] is QGate.CNOT_START and gate[1] < row:
+				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
+				out.fill(fg, (
+					gate_size*col + gate_size // 2 - 20,
+					gate_size*row - gate_size // 2, 40, gate_size * (row - gate[1]) - gate_size // 2 + 40))
+			if gate[0] is QGate.CNOT_END and gate[1] < row:
+				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
+				out.fill(fg, (
+					gate_size*col + gate_size // 2 - 20,
+					gate_size*row - 40, 40, gate_size * (row - gate[1]) - gate_size // 2 + 40))
 
 	return out
 
 def get_qc_display_pos(surf_size):
-	return ((w//2-surf_size[0])//2, (h-surf_size[1])//2)
+	return ((w//2-surf_size[0])//2, (h-surf_size[1])//2 - 100)
 
 def render_graph(values: np.ndarray, size):
 	out = pygame.Surface((size, 25 + size + 25), SRCALPHA)
@@ -208,9 +228,11 @@ class Animation:
 	def __init__(self, start, target):
 		self.state = start
 		self.target = target
+		print(start, target)
 
 class GraphAnimation(Animation):
 	def tick(self):
+		print(self, 'ticked')
 		self.state = (5 * self.state + self.target) / 6
 
 	def is_complete(self):
@@ -218,6 +240,7 @@ class GraphAnimation(Animation):
 
 class DistAnimation(Animation):
 	def tick(self):
+		print(self, 'ticked')
 		self.state = [(5 * state + target) // 6
 			for state, target in zip(self.state, self.target)]
 
@@ -235,6 +258,7 @@ def update_animations(old_view, new_view, animations):
 	new_state = curr_view.measurements
 	if new_state is not None and old_state is not None:
 		animations.append(DistAnimation(old_state, new_state))
+	print(animations)
 
 class Button:
 	def __init__(self, label, fg, bg, hover_col, *rect_args):
@@ -291,20 +315,43 @@ def reset_button(view):
 		DistAnimation(old_dist, view.measurements)
 	)
 
-@Button('Add View', c-0, transparent_fg, fg, (w//4, 6*h//7, w//5, 75))
-def add_column_button(view):
-	file = tkopen()
-	
-	update_animations(view)
+@Button('Add View', c-0, transparent_fg, fg, (w//4, 5*h//7, w//3, 75))
+def add_view_button():
+	filename = tkopen()
 
-@Button('Delete View', c-0, transparent_fg, fg, (w//4, 6*h//7, w//5, 75))
-def delete_column_button(curr_view_idx):
-	if len(views) <= 1: return
-	old_dist = views[curr_view_idx].measurements
-	old_graph = views[curr_view_idx].circuit.get_statevector().copy()
-	view.generate_probabilities()
-	view.showing_distribution = False
-	update_animations(view)
+	if not filename: return curr_view, curr_view_idx
+
+	file = open(filename)
+	n = int(file.readline())
+	qc = QuantumCircuit(n)
+
+	for line in file:
+		split = line.split()
+		if split[0] == 'h':
+			qc.h(int(split[1]))
+		if split[0] == 'x':
+			qc.x(int(split[1]))
+		if split[0] == 'y':
+			qc.y(int(split[1]))
+		if split[0] == 'z':
+			qc.z(int(split[1]))
+		if split[0] == 'cnot':
+			qc.cx(int(split[1]), int(split[2]))
+	
+	view = CircuitView(qc)
+	views.append(view)
+	update_animations(curr_view, view, animations)
+	return view, len(views) - 1
+
+@Button('Delete View', c-0, transparent_fg, fg, (w//4, 5*h//7, w//3, 75))
+def delete_view_button(view_idx):
+	if len(views) <= 1: return curr_view
+	print('POP')
+	old_view = views[view_idx]
+	views.pop(view_idx)
+	if view_idx >= len(views): view_idx = len(views) - 1
+	update_animations(old_view, views[view_idx], animations)
+	return views[view_idx], view_idx
 
 '''  I could do this
 @measure
@@ -374,6 +421,10 @@ while running:
 					measure_button.handler(curr_view)
 				elif event.pos in reset_button:
 					reset_button.handler(curr_view)
+				elif event.pos in add_view_button:
+					curr_view, curr_view_idx = add_view_button.handler()
+				elif event.pos in delete_view_button:
+					curr_view, curr_view_idx = delete_view_button.handler(curr_view_idx)
 				dragging = True
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
@@ -390,7 +441,8 @@ while running:
 			deletees.append(i)
 
 	for deletee in reversed(deletees):
-		animations.pop(deletee)
+		d = animations.pop(deletee)
+		print(d, 'is done')
 
 	updateDisplay()
 	updateStat()

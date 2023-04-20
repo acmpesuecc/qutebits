@@ -9,6 +9,7 @@ class QGate(Enum):
     CNOT_START = "."
     CNOT_END = "x"
     IDENTITY = "I"
+    START = "0"
 
 cnots = [QGate.CNOT_START, QGate.CNOT_END]
 
