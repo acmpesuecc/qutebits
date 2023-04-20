@@ -3,6 +3,8 @@ import numpy as np
 from consts import gate2matrix, cnots
 import random
 
+DEFAULT_SHOTS = 8192
+
 class Executor:
     def __init__(self, qc: QuantumCircuit):
         self.state_vector = np.zeros(2**qc.no_qubits)
@@ -32,11 +34,11 @@ class Executor:
     def get_statevector(self):
         return self.state_vector
 
-    def get_probs(self):
+    def get_probs(self) -> list:
         probabilities = [np.round(abs(e)**2, 4) for e in self.state_vector]
         return probabilities
 
-    def measure_all(self, shots=8096):
+    def measure_all(self, shots=DEFAULT_SHOTS):
         values = [i for i in range(len(self.state_vector))]
         probabilities = [np.round(abs(e)**2, 4) for e in self.state_vector]
         # cum_probs = [probabilities[0]]
