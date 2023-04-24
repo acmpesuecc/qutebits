@@ -158,7 +158,8 @@ def render_quantum_circuit(qc):
 				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
 				out.fill(fg, (
 					gate_size*col + gate_size // 2 - 20,
-					gate_size*row - gate_size // 2, 40, gate_size * (row - gate[1]) - gate_size // 2 + 40))
+					gate_size*row - gate_size // 2, 40,
+					gate_size * (row - gate[1]) - gate_size // 2 + 40))
 			if gate[0] is QGate.CNOT_END and gate[1] < row:
 				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
 				out.fill(fg, (
