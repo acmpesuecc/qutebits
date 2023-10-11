@@ -6,11 +6,18 @@
 # - Edit circuit
 
 from QuantumCircuit import QuantumCircuit, QGate
-from Executor import Executor, np
+from Executor import Executor, np, DEFAULT_SHOTS
 
 import pygame
 from pygame.locals import *
 pygame.font.init()
+
+from tkinter.filedialog import asksaveasfilename as tksave
+from tkinter.filedialog import askopenfilename as tkopen
+from tkinter import Tk
+
+root = Tk()
+root.withdraw()
 
 font_height = 72
 
@@ -28,7 +35,7 @@ fps = 60
 
 w, h = res = (1280, 720)
 
-gate_size = 80
+gate_size = 256
 
 gate_sprites = {
 	QGate.HADAMARD:   pygame.image.load('./sprites/hadamard.png'),
@@ -38,6 +45,7 @@ gate_sprites = {
 	QGate.CNOT_START: pygame.image.load('./sprites/cnot start.png'),
 	QGate.CNOT_END:   pygame.image.load('./sprites/cnot end.png'),
 	QGate.IDENTITY:   pygame.image.load('./sprites/identity.png'),
+	QGate.START:      pygame.image.load('./sprites/start.png')
 }
 
 def updateStat(msg = None, update = True):
@@ -56,33 +64,66 @@ def resize(size):
 	global w, h, res, display
 	w, h = res = size
 	display = pygame.display.set_mode(res, RESIZABLE)
+	update_sizes()
 	updateDisplay()
 
 def updateDisplay():
 	display.fill(bg)
 
 	graph_animation = None
+	dist_animation = None
 	for animation in animations:
 		if isinstance(animation, GraphAnimation):
 			graph_animation = animation
+		if isinstance(animation, DistAnimation):
+			dist_animation = animation
 
 	# Left Half - circuit
 	surf = render_quantum_circuit(curr_view.circuit)
-	x, y = ((w//2-surf.get_width())//2, (h-surf.get_height())//2)
-	display.blit(surf, (x, y))
+	display.blit(surf, get_qc_display_pos(surf.get_size()))
 
 	# Right Half - graphs
-	graph_size = w//3
-	if showing_distribution:
-		graph = render_measurement(curr_view.measurements, graph_size)
+	graph_size = h//3
+
+	if dist_animation is None or curr_view.measurements is None:
+		dist_state = curr_view.measurements
 	else:
-		if graph_animation is None:
-			display_state = curr_view.executor.get_statevector()
-		else:
-			display_state = graph_animation.state
-		graph = render_graph(display_state, graph_size)
-	x, y = (w//2 + (w//2-graph.get_width())//2, (h-graph.get_height())//2)
+		dist_state = dist_animation.state
+	dist = render_measurement(dist_state, graph_size,
+		DEFAULT_SHOTS, curr_view.showing_distribution)
+	if curr_view.showing_distribution:
+		tsurf = font.render('Measurements', True, fg)
+	else:
+		tsurf = font.render('Probabilities', True, fg)
+
+
+	if graph_animation is None:
+		graph_state = curr_view.executor.get_statevector()
+	else:
+		graph_state = graph_animation.state
+	graph = render_graph(graph_state, graph_size)
+
+	x, y = (w//2 + (w//2-graph_size)//2, (h-2*graph_size)//3)
+	display.blit(dist, (x, y))
+
+	x, y = (w//2 + (w//2-graph_size)//2, (2*h-graph_size)//3)
 	display.blit(graph, (x, y))
+
+	hover = pygame.mouse.get_pos() in measure_button
+	measure_surf = measure_button.render(hover=hover)
+	display.blit(measure_surf, measure_button.get_pos())
+
+	hover = pygame.mouse.get_pos() in reset_button
+	reset_surf = reset_button.render(hover=hover)
+	display.blit(reset_surf, reset_button.get_pos())
+
+	hover = pygame.mouse.get_pos() in add_view_button
+	measure_surf = add_view_button.render(hover=hover)
+	display.blit(measure_surf, add_view_button.get_pos())
+
+	hover = pygame.mouse.get_pos() in delete_view_button
+	reset_surf = delete_view_button.render(hover=hover)
+	display.blit(reset_surf, delete_view_button.get_pos())
 
 	updateStat(update = False)
 	pygame.display.flip()
@@ -92,7 +133,16 @@ def toggleFullscreen():
 	res, pres =  pres, res
 	w, h = res
 	if display.get_flags()&FULLSCREEN: resize(res)
-	else: display = pygame.display.set_mode(res, FULLSCREEN); updateDisplay()
+	else:
+		display = pygame.display.set_mode(res, FULLSCREEN)
+		update_sizes()
+		updateDisplay()
+
+def update_sizes():
+	measure_button.update_pos(((w//2-2*measure_button.rect.w)//3, 6*h//7))
+	reset_button.update_pos(((w-reset_button.rect.w)//3, 6*h//7))
+	add_view_button.update_pos(((w//2-2*add_view_button.rect.w)//3, 5*h//7))
+	delete_view_button.update_pos(((w-delete_view_button.rect.w)//3, 5*h//7))
 
 def render_quantum_circuit(qc):
 	c_w = max(len(line) for line in qc.circ)
@@ -101,10 +151,25 @@ def render_quantum_circuit(qc):
 	out = pygame.Surface((gate_size + c_w*gate_size, c_h*gate_size), SRCALPHA)
 
 	for row, qubit_line in enumerate(qc.circ):
-		for col, gate in enumerate(qubit_line):
-			out.blit(gate_sprites[gate[0]], (gate_size*(1+col), gate_size*row))
+		out.blit(gate_sprites[QGate.START], (0, gate_size*row))
+		for col, gate in enumerate(qubit_line, 1):
+			out.blit(gate_sprites[gate[0]], (gate_size*col, gate_size*row))
+			if gate[0] is QGate.CNOT_START and gate[1] < row:
+				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
+				out.fill(fg, (
+					gate_size*col + gate_size // 2 - 20,
+					gate_size*row - gate_size // 2, 40,
+					gate_size * (row - gate[1]) - gate_size // 2 + 40))
+			if gate[0] is QGate.CNOT_END and gate[1] < row:
+				print(gate[1], row, gate_size*row - gate_size // 2, gate_size // 2)
+				out.fill(fg, (
+					gate_size*col + gate_size // 2 - 20,
+					gate_size*row - 40, 40, gate_size * (row - gate[1]) - gate_size // 2 + 40))
 
 	return out
+
+def get_qc_display_pos(surf_size):
+	return ((w//2-surf_size[0])//2, (h-surf_size[1])//2 - 100)
 
 def render_graph(values: np.ndarray, size):
 	out = pygame.Surface((size, 25 + size + 25), SRCALPHA)
@@ -123,12 +188,13 @@ def render_graph(values: np.ndarray, size):
 		out.blit(tsurf, (offset + section_width * i, 25 + size))
 	return out
 
-def render_measurement(values: list, size):
+def render_measurement(values: list, size, shots, showing_distribution = False):
 	out = pygame.Surface((size, 25 + size + 25), SRCALPHA)
+	if not values: return out
+
 	section_width = size // len(values)
 	bar_width = section_width // 2
 	qbits = len(values).bit_length() - 1
-	shots = sum(values)
 	norms = [value / shots for value in values]
 	for i, (norm, value) in enumerate(zip(norms, values)):
 		out.fill(transparent_fg, (
@@ -136,11 +202,12 @@ def render_measurement(values: list, size):
 			25, bar_width, size))
 		out.fill(fg, (
 			bar_width // 2 + section_width * i,
-			25 + size * (1 - abs(norm)), bar_width, size * abs(norm)))
+			25 + size * (1 - norm), bar_width, size * norm))
 
-		tsurf = tfont.render(f'{value}', True, fg)
-		offset = (section_width - tsurf.get_width()) // 2
-		out.blit(tsurf, (offset + section_width * i, 0))
+		if showing_distribution:
+			tsurf = tfont.render(f'{value}', True, fg)
+			offset = (section_width - tsurf.get_width()) // 2
+			out.blit(tsurf, (offset + section_width * i, 0))
 
 		tsurf = tfont.render(f'{i:0{qbits}b}', True, fg)
 		offset = (section_width - tsurf.get_width()) // 2
@@ -151,24 +218,150 @@ class CircuitView:
 	def __init__(self, circuit):
 		self.circuit = circuit
 		self.executor = Executor(circuit)
-		self.measurements = None
+		self.showing_distribution = False
+		self.generate_probabilities()
 
+	def generate_probabilities(self, shots=DEFAULT_SHOTS):
+		self.measurements = [int(i*shots) for i in self.executor.get_probs()]
 
+# Number of qubits must be constant between views
 class Animation:
 	def __init__(self, start, target):
 		self.state = start
 		self.target = target
+		print(start, target)
 
 class GraphAnimation(Animation):
 	def tick(self):
+		print(self, 'ticked')
 		self.state = (5 * self.state + self.target) / 6
 
 	def is_complete(self):
 		return np.all(abs(self.state - self.target) < 0.00001)
 
+class DistAnimation(Animation):
+	def tick(self):
+		print(self, 'ticked')
+		self.state = [(5 * state + target) // 6
+			for state, target in zip(self.state, self.target)]
+
+	def is_complete(self):
+		return all(abs(state - target) <= 6
+			for state, target in zip(self.state, self.target))
+
+def update_animations(old_view, new_view, animations):
+	old_state = old_view.executor.get_statevector().copy()
+	new_state = curr_view.executor.get_statevector().copy()
+
+	animations.append(GraphAnimation(old_state, new_state))
+
+	old_state = old_view.measurements
+	new_state = curr_view.measurements
+	if new_state is not None and old_state is not None:
+		animations.append(DistAnimation(old_state, new_state))
+	print(animations)
+
+class Button:
+	def __init__(self, label, fg, bg, hover_col, *rect_args):
+		self.label = label
+		self.fg = fg
+		self.bg = bg
+		self.hover_col = hover_col
+		self.rect = pygame.Rect(*rect_args)
+
+	def update_pos(self, pos):
+		self.rect.topleft = pos  # rect has getters and setters
+
+	def __call__(self, handler):  # for use as a decorator
+		# a side effect is that I can use the
+		# decorator syntax to reassign a handler
+		self.handler = handler
+		return self
+
+	def __contains__(self, pos):
+		return pygame.Rect(pos, (0, 0)) in self.rect
+
+	def get_pos(self):
+		return self.rect[:2]
+
+	def render(self, hover = False):
+		out = pygame.Surface(self.rect.size, SRCALPHA)
+		out.fill(self.hover_col if hover else self.bg)
+
+		tsurf = font.render(self.label, True, self.fg)
+		x, y = (
+			(self.rect.w - tsurf.get_width()) // 2,
+			(self.rect.h - tsurf.get_height()) // 2
+		)
+		out.blit(tsurf, (x, y))
+
+		return out
+
+@Button('Measure', c-0, transparent_fg, fg, (w//4, 6*h//7, w//5, 75))
+def measure_button(view):
+	old_dist = view.measurements
+	view.measurements = view.executor.measure_all()
+	view.showing_distribution = True
+	animations.append(
+		DistAnimation(old_dist, view.measurements)
+	)
+
+@Button('Reset', c-0, transparent_fg, fg, (w//4, 6*h//7, w//5, 75))
+def reset_button(view):
+	print('Reset button is clicked')
+	old_dist = view.measurements
+	view.generate_probabilities()
+	view.showing_distribution = False
+	animations.append(
+		DistAnimation(old_dist, view.measurements)
+	)
+
+@Button('Add View', c-0, transparent_fg, fg, (w//4, 5*h//7, w//3, 75))
+def add_view_button():
+	filename = tkopen()
+
+	if not filename: return curr_view, curr_view_idx
+
+	file = open(filename)
+	n = int(file.readline())
+	qc = QuantumCircuit(n)
+
+	for line in file:
+		split = line.split()
+		if split[0] == 'h':
+			qc.h(int(split[1]))
+		if split[0] == 'x':
+			qc.x(int(split[1]))
+		if split[0] == 'y':
+			qc.y(int(split[1]))
+		if split[0] == 'z':
+			qc.z(int(split[1]))
+		if split[0] == 'cnot':
+			qc.cx(int(split[1]), int(split[2]))
+	
+	view = CircuitView(qc)
+	views.append(view)
+	update_animations(curr_view, view, animations)
+	return view, len(views) - 1
+
+@Button('Delete View', c-0, transparent_fg, fg, (w//4, 5*h//7, w//3, 75))
+def delete_view_button(view_idx):
+	if len(views) <= 1: return curr_view
+	print('POP')
+	old_view = views[view_idx]
+	views.pop(view_idx)
+	if view_idx >= len(views): view_idx = len(views) - 1
+	update_animations(old_view, views[view_idx], animations)
+	return views[view_idx], view_idx
+
+'''  I could do this
+@measure
+def hi:
+	print('measure')
+'''
+
 pos = [0, 0]
 dragging = False
-showing_distribution = False
 
 circ1 = QuantumCircuit(2)
 circ1.h(1)
@@ -187,7 +380,9 @@ animations = []
 
 resize(res)
 pres = pygame.display.list_modes()[0]
+toggleFullscreen()
 clock = pygame.time.Clock()
+pygame.key.set_repeat(500, 50)
 running = True
 while running:
 	for event in pygame.event.get():
@@ -195,34 +390,42 @@ while running:
 			if   event.key == K_ESCAPE: running = False
 			elif event.key == K_F11: toggleFullscreen()
 
-			elif event.key == K_r:  # reset experiment
-				curr_view.measurements = None
+			elif event.key == K_r:  # reset measurement
+				reset_button.handler(curr_view)
 
-			elif event.key == K_d:  # show distribution
-				showing_distribution = True
-				if curr_view.measurements is None:
-					curr_view.measurements = curr_view.executor.measure_all()
+			elif event.key == K_m:  # perform measurement
+				measure_button.handler(curr_view)
+				
+			elif event.key in (K_UP, K_DOWN):
+				if event.key == K_DOWN: curr_view_idx += 1
+				elif event.key == K_UP: curr_view_idx -= 1
 
-		elif event.type == KEYUP:
-			if event.key == K_d:
-				showing_distribution = False
+				old_view = curr_view
+				curr_view_idx = max(min(curr_view_idx, len(views)-1), 0)
+				curr_view = views[curr_view_idx]
+				update_animations(old_view, curr_view, animations)
 
 		elif event.type == VIDEORESIZE:
 			if not display.get_flags()&FULLSCREEN: resize(event.size)
 		elif event.type == QUIT: running = False
 		elif event.type == MOUSEBUTTONDOWN:
 			if event.button in (4, 5):
-				delta = event.button*2-9
+				curr_view_idx += event.button*2-9
+
 				old_view = curr_view
-				curr_view_idx += delta
 				curr_view_idx = max(min(curr_view_idx, len(views)-1), 0)
 				curr_view = views[curr_view_idx]
+				update_animations(old_view, curr_view, animations)
 
-				old_state = old_view.executor.get_statevector().copy()
-				new_state = curr_view.executor.get_statevector().copy()
-
-				animations.append(GraphAnimation(old_state, new_state))
 			elif event.button == 1:
+				if   event.pos in measure_button:
+					measure_button.handler(curr_view)
+				elif event.pos in reset_button:
+					reset_button.handler(curr_view)
+				elif event.pos in add_view_button:
+					curr_view, curr_view_idx = add_view_button.handler()
+				elif event.pos in delete_view_button:
+					curr_view, curr_view_idx = delete_view_button.handler(curr_view_idx)
 				dragging = True
 		elif event.type == MOUSEBUTTONUP:
 			if event.button == 1:
@@ -239,7 +442,8 @@ while running:
 			deletees.append(i)
 
 	for deletee in reversed(deletees):
-		animations.pop(deletee)
+		d = animations.pop(deletee)
+		print(d, 'is done')
 
 	updateDisplay()
 	updateStat()

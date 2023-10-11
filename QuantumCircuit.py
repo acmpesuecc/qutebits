@@ -1,6 +1,16 @@
 from enum import Enum, auto
 import io
 
+class QGate(Enum):
+    HADAMARD = "H"
+    PAULI_X = "X"
+    PAULI_Y = "Y"
+    PAULI_Z = "Z"
+    CNOT_START = "."
+    CNOT_END = "x"
+    IDENTITY = "I"
+    START = "0"
+
 cnots = [QGate.CNOT_START, QGate.CNOT_END]
 
 
