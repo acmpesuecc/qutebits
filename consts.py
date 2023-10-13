@@ -25,6 +25,11 @@ GATE_CNOT_OPP = np.array([[1, 0, 0, 0],
                           [0, 0, 1, 0],
                           [0, 1, 0, 1]])
 
+ 
+def PHASE_SHIFTER_GATE(phi):
+   return  np.array([[np.exp(1j * phi), 0],
+                   [0, np.exp(-1j * phi)]])
+ 
 gate2matrix = {
     g.HADAMARD: GATE_HADAMARD,
     g.PAULI_X: GATE_PAULI_X,
@@ -34,3 +39,6 @@ gate2matrix = {
     g.CNOT_END: GATE_CNOT_OPP,
     g.IDENTITY: np.eye(2)
 }
+import numpy as np
+from scipy.linalg import expm
+
