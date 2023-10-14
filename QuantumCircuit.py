@@ -11,6 +11,9 @@ class QGate(Enum):
     IDENTITY = "I"
     START = "0"
 
+    T_GATE = "T"
+    #Add custom gate
+
 cnots = [QGate.CNOT_START, QGate.CNOT_END]
 
 
@@ -52,6 +55,9 @@ class QuantumCircuit:
     def z(self, index):
         self.circ[index].append((QGate.PAULI_Z,))
 
+    def t(self, index):
+        self.circ[index].append((QGate.T_GATE,))
+
     def cx(self, start, end):
         if start+1 != end and start-1 != end:
             raise NotImplementedError(
@@ -66,3 +72,14 @@ class QuantumCircuit:
         while len(self.circ[end]) < insert_index:
             self.circ[end].append((QGate.IDENTITY,))
         self.circ[end].append((QGate.CNOT_END, start))
+
+    def add_custom_gate(self, index, gate_type, *params):
+        self.circ[index].append((gate_type, *params))
+
+#Usage
+qc = QuantumCircuit(2)
+qc.t(0)  
+qc.draw()  
+
+
+  
