@@ -24,9 +24,6 @@ GATE_CNOT_OPP = np.array([[1, 0, 0, 0],
                           [0, 0, 0, 1],
                           [0, 0, 1, 0],
                           [0, 1, 0, 1]])
-  
-GATE_T = np.array([[1, 0],
-                  [0, 1]])
 
  
 def PHASE_SHIFTER_GATE(phi):
@@ -40,9 +37,8 @@ gate2matrix = {
     g.PAULI_Z: GATE_PAULI_Z,
     g.CNOT_START: GATE_CNOT,
     g.CNOT_END: GATE_CNOT_OPP,
-    g.IDENTITY: np.eye(2),
-    g.T_GATE: GATE_T  # Added the T Gate matrix
+    g.IDENTITY: np.eye(2)
 }
-
 import numpy as np
 from scipy.linalg import expm
+

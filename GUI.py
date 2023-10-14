@@ -45,8 +45,7 @@ gate_sprites = {
 	QGate.CNOT_START: pygame.image.load('./sprites/cnot start.png'),
 	QGate.CNOT_END:   pygame.image.load('./sprites/cnot end.png'),
 	QGate.IDENTITY:   pygame.image.load('./sprites/identity.png'),
-	QGate.START:      pygame.image.load('./sprites/start.png'),
-	QGate.T_GATE:	  pygame.image.load('./sprites/z.png')
+	QGate.START:      pygame.image.load('./sprites/start.png')
 }
 
 def updateStat(msg = None, update = True):
@@ -347,7 +346,7 @@ def add_view_button():
 
 @Button('Delete View', c-0, transparent_fg, fg, (w//4, 5*h//7, w//3, 75))
 def delete_view_button(view_idx):
-	if len(views) <= 1: return curr_view, curr_view_idx
+	if len(views) <= 1: return curr_view
 	print('POP')
 	old_view = views[view_idx]
 	views.pop(view_idx)
@@ -373,14 +372,8 @@ circ2.h(0)
 circ2.h(1)
 circ2.y(0)
 
-circ3 = QuantumCircuit(2)
-circ3.t(0)
-#circ3.t(1)
-circ3.h(1)
-circ3.y(0)
-
 curr_view_idx = 0
-views = [CircuitView(circ1), CircuitView(circ2), CircuitView(circ3)]
+views = [CircuitView(circ1), CircuitView(circ2)]
 curr_view = views[curr_view_idx]
 
 animations = []
