@@ -61,6 +61,17 @@ def updateStat(msg = None, update = True):
 
 	if update: pygame.display.update(rect)
 
+def Apply_cnot(circuit,control_qubit, target_qubit):
+	control_pos=control_qubit
+	target_pos=target_qubit
+	distance=abs(target_pos-control_pos)
+
+	if distance>1:
+		circuit.swap(control_pos,control_pos+1)
+		control_pos=control_pos+1
+	circuit.cnot(control_pos,target_pos)
+qc=QuantumCircuit(5)
+Apply_cnot(qc,control_qubit=1,target_qubit=4)
 def resize(size):
 	global w, h, res, display
 	w, h = res = size
